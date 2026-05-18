@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>余火 · 被拒之后，你还没凉透</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --bg-deep: #0a0a12;
+    --bg-mid: #12121f;
+    --text-main: #d4cdc5;
+    --text-dim: #7a7580;
+    --fire-orange: #e8642c;
+    --fire-warm: #f09030;
+    --fire-glow: rgba(232, 100, 44, 0.15);
+    --star-blue: #4a6fa5;
+    --star-yellow: #c4a845;
+  }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-main);
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Helvetica Neue", sans-serif;
+    line-height: 1.9;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 星空背景 */
+  #stars-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+
+  /* 火焰粒子 */
+  #fire-canvas {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%; height: 40%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* 主内容区 */
+  #scene-container {
+    position: relative;
+    z-index: 10;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1.5rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 文字区域 */
+  .text-area {
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    min-height: 30vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .story-line {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+    margin-bottom: 0.3em;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+  }
+
+  .story-line.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .story-line.pause-line {
+    margin: 0.8em 0;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+  }
+
+  .story-line.highlight {
+    color: var(--fire-warm);
+    font-size: 1.15rem;
+    font-weight: 500;
+  }
+
+  .story-line.dim {
+    color: var(--text-dim);
+    font-size: 0.92rem;
+  }
+
+  .story-line.quote {
+    color: var(--text-dim);
+    font-style: italic;
+    border-left: 2px solid var(--fire-orange);
+    padding-left: 1em;
+    text-align: left;
+    margin: 0.5em auto;
+    max-width: 300px;
+  }
+
+  /* 选择按钮 */
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 380px;
+    margin-top: 2rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1.5s ease, transform 1.5s ease;
+  }
+
+  .choices.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .choice-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(232, 100, 44, 0.2);
+    color: var(--text-main);
+    padding: 0.9rem 1.2rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.4s ease;
+    text-align: left;
+    font-family: inherit;
+    letter-spacing: 0.03em;
+    line-height: 1.6;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .choice-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, var(--fire-glow), transparent);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .choice-btn:hover, .choice-btn:active {
+    border-color: var(--fire-orange);
+    background: rgba(232, 100, 44, 0.08);
+    transform: translateX(4px);
+  }
+
+  .choice-btn:hover::before, .choice-btn:active::before {
+    opacity: 1;
+  }
+
+  .choice-btn span {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 终幕按钮特殊样式 */
+  .final-btn {
+    text-align: center;
+    font-size: 1.05rem;
+    padding: 1.1rem 1.5rem;
+  }
+
+  .final-btn.fire-btn {
+    border-color: var(--fire-orange);
+    background: rgba(232, 100, 44, 0.12);
+  }
+
+  .final-btn.lamp-btn {
+    border-color: var(--fire-warm);
+    background: rgba(240, 144, 48, 0.08);
+  }
+
+  .final-btn.star-btn {
+    border-color: var(--star-blue);
+    background: rgba(74, 111, 165, 0.1);
+  }
+
+  /* 场景过渡遮罩 */
+  #transition-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--bg-deep);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+  }
+
+  #transition-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* 中央火焰动画（终幕用） */
+  .fire-center {
+    width: 60px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    position: relative;
+  }
+
+  .fire-center .flame {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    animation: flicker 2s ease-in-out infinite alternate;
+  }
+
+  .flame.f1 {
+    width: 30px; height: 50px;
+    background: radial-gradient(ellipse at bottom, #f09030 0%, #e8642c 40%, rgba(232,100,44,0) 70%);
+    animation-duration: 2s;
+  }
+
+  .flame.f2 {
+    width: 22px; height: 40px;
+    background: radial-gradient(ellipse at bottom, #ffe080 0%, #f09030 50%, rgba(240,144,48,0) 80%);
+    animation-duration: 1.5s;
+    animation-delay: 0.3s;
+  }
+
+  .flame.f3 {
+    width: 16px; height: 30px;
+    background: radial-gradient(ellipse at bottom, #fff8e0 0%, #ffe080 50%, rgba(255,224,128,0) 80%);
+    animation-duration: 1.2s;
+    animation-delay: 0.6s;
+  }
+
+  @keyframes flicker {
+    0% { transform: translateX(-50%) scaleY(1) scaleX(1) rotate(-1deg); }
+    25% { transform: translateX(-50%) scaleY(1.05) scaleX(0.95) rotate(1deg); }
+    50% { transform: translateX(-50%) scaleY(0.95) scaleX(1.05) rotate(-0.5deg); }
+    75% { transform: translateX(-50%) scaleY(1.08) scaleX(0.93) rotate(0.5deg); }
+    100% { transform: translateX(-50%) scaleY(0.98) scaleX(1.02) rotate(-1deg); }
+  }
+
+  /* 深夜模式时间显示 */
+  .time-display {
+    position: fixed;
+    top: 2rem;
+    right: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    z-index: 20;
+    letter-spacing: 0.1em;
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 2px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(232,100,44,0.2); border-radius: 1px; }
+
+  /* 减少动画 */
+  @media (prefers-reduced-motion: reduce) {
+    .story-line { transition: opacity 0.3s ease; transform: none !important; }
+    .choices { transition: opacity 0.3s ease; transform: none !important; }
+    .flame { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+<canvas id="fire-canvas"></canvas>
+<div id="transition-overlay"></div>
+<div class="time-display" id="time-display"></div>
+
+<div id="scene-container">
+  <div class="text-area" id="text-area"></div>
+  <div class="choices" id="choices"></div>
+</div>
+
+<script>
+// ===== 星空背景 =====
+const starsCanvas = document.getElementById('stars-canvas');
+const starsCtx = starsCanvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  starsCanvas.width = window.innerWidth;
+  starsCanvas.height = window.innerHeight;
+  stars = [];
+  const count = Math.floor((starsCanvas.width * starsCanvas.height) / 3000);
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * starsCanvas.width,
+      y: Math.random() * starsCanvas.height,
+      r: Math.random() * 1.2 + 0.3,
+      alpha: Math.random() * 0.6 + 0.2,
+      speed: Math.random() * 0.005 + 0.002,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function drawStars(time) {
+  starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+  // 深色渐变背景
+  const grad = starsCtx.createRadialGradient(
+    starsCanvas.width * 0.5, starsCanvas.height * 0.4, 0,
+    starsCanvas.width * 0.5, starsCanvas.height * 0.4, starsCanvas.height * 0.9
+  );
+  grad.addColorStop(0, '#12121f');
+  grad.addColorStop(1, '#0a0a12');
+  starsCtx.fillStyle = grad;
+  starsCtx.fillRect(0, 0, starsCanvas.width, starsCanvas.height);
+
+  for (const s of stars) {
+    const twinkle = Math.sin(time * s.speed * 2 + s.phase) * 0.3 + 0.7;
+    starsCtx.beginPath();
+    starsCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    starsCtx.fillStyle = `rgba(200, 200, 220, ${s.alpha * twinkle})`;
+    starsCtx.fill();
+  }
+}
+
+// ===== 火焰粒子 =====
+const fireCanvas = document.getElementById('fire-canvas');
+const fireCtx = fireCanvas.getContext('2d');
+let fireParticles = [];
+
+function initFire() {
+  fireCanvas.width = window.innerWidth;
+  fireCanvas.height = window.innerHeight * 0.4;
+}
+
+function spawnFireParticle() {
+  if (fireParticles.length > 40) return;
+  fireParticles.push({
+    x: fireCanvas.width * 0.5 + (Math.random() - 0.5) * 30,
+    y: fireCanvas.height,
+    vx: (Math.random() - 0.5) * 0.6,
+    vy: -(Math.random() * 1.5 + 0.8),
+    r: Math.random() * 3 + 1.5,
+    life: 1,
+    decay: Math.random() * 0.015 + 0.008,
+    hue: Math.random() * 30 + 15
+  });
+}
+
+function drawFire() {
+  fireCtx.clearRect(0, 0, fireCanvas.width, fireCanvas.height);
+  for (let i = fireParticles.length - 1; i >= 0; i--) {
+    const p = fireParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= p.decay;
+    if (p.life <= 0) { fireParticles.splice(i, 1); continue; }
+    fireCtx.beginPath();
+    fireCtx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    fireCtx.fillStyle = `hsla(${p.hue}, 90%, 55%, ${p.life * 0.5})`;
+    fireCtx.fill();
+  }
+}
+
+// ===== 动画循环 =====
+let animFrame;
+function animate(time) {
+  drawStars(time);
+  if (Math.random() < 0.3) spawnFireParticle();
+  drawFire();
+  animFrame = requestAnimationFrame(animate);
+}
+
+initStars();
+initFire();
+animate(0);
+
+window.addEventListener('resize', () => {
+  initStars();
+  initFire();
+});
+
+// ===== 时间显示 =====
+function updateTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('time-display').textContent = `${h}:${m}`;
+}
+updateTime();
+setInterval(updateTime, 30000);
+
+// ===== 场景数据 =====
+const scenes = {
+
+  '0': {
+    lines: [
+      { text: '每个人都有一段', cls: '' },
+      { text: '觉得自己完蛋了的时刻', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '你现在，在经历这个时刻吗？', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '是的，我需要有人陪我', next: '1' },
+      { text: '我不知道，我只是想看看', next: '0b', alt: true },
+      { text: '我没有，但我想了解', next: '0c', alt: true },
+    ]
+  },
+
+  '0b': {
+    lines: [
+      { text: '没关系。', cls: '' },
+      { text: '有时候我们不确定自己需不需要帮助，', cls: 'dim' },
+      { text: '只是觉得——', cls: 'dim' },
+      { text: '今晚有点冷。', cls: '' },
+    ],
+    choices: [
+      { text: '继续', next: '1' },
+    ]
+  },
+
+  '0c': {
+    lines: [
+      { text: '这是一个关于求职的故事。', cls: '' },
+      { text: '主人公叫林晚。', cls: 'dim' },
+      { text: '她的故事可能也是你的。', cls: '' },
+      { text: '不急，慢慢看。', cls: 'dim' },
+    ],
+    choices: [
+      { text: '继续', next: '1' },
+    ]
+  },
+
+  '1': {
+    lines: [
+      { text: '凌晨1:47。', cls: 'dim' },
+      { text: '林晚的手机亮了。', cls: '' },
+      { text: '又一封邮件。', cls: '' },
+      { text: '她没有点开。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '这是第23封了。', cls: 'highlight' },
+      { text: '前22封，每一封她都认认真真读完了。', cls: 'dim' },
+      { text: '"感谢您对本岗位的关注"——', cls: 'quote' },
+      { text: '"经过慎重评估"——', cls: 'quote' },
+      { text: '"祝愿您未来一切顺利"——', cls: 'quote' },
+      { text: '她甚至能背下来模板的段落顺序。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '但今晚，她不想读了。', cls: '' },
+      { text: '她把手机扣在枕头旁边，', cls: '' },
+      { text: '屏幕朝下。', cls: '' },
+      { text: '光从缝隙里漏出来，', cls: 'dim' },
+      { text: '像一条不愿意灭掉的裂缝。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '帮她看看这封拒信写了什么', next: '1A' },
+      { text: '别看了，关灯睡觉', next: '1B' },
+      { text: '她投的什么岗位？', next: '1C' },
+    ]
+  },
+
+  '1A': {
+    lines: [
+      { text: '你替林晚打开了那封邮件。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '「林晚同学，感谢您投递我司新媒体运营岗位……」', cls: 'quote' },
+      { text: '「经过综合评估，您的经历与岗位要求存在一定差距……」', cls: 'quote' },
+      { text: '「建议您积累更多相关实践经验后再次尝试……」', cls: 'quote' },
+      { text: '……', cls: 'pause-line' },
+      { text: '"存在一定差距"。', cls: 'highlight' },
+      { text: '林晚盯着这五个字看了很久。', cls: '' },
+      { text: '她独立运营校园公众号一年，粉丝从0做到3000，', cls: 'dim' },
+      { text: '写过10w+的推文，带过3人的内容团队。', cls: 'dim' },
+      { text: '她觉得这些都是真的。', cls: '' },
+      { text: '但这五个字让她觉得——', cls: '' },
+      { text: '也许都是假的。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '2' },
+    ]
+  },
+
+  '1B': {
+    lines: [
+      { text: '你帮她关了灯。', cls: '' },
+      { text: '很好，不看就不会受伤。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '但你知道的，', cls: '' },
+      { text: '闭眼之后那些句子不会消失。', cls: '' },
+      { text: '它们会换一种方式来：', cls: 'dim' },
+      { text: '"是不是我真的不行？"', cls: 'quote' },
+      { text: '"是不是我做的那些根本不值一提？"', cls: 'quote' },
+      { text: '"23次了，还有什么意义？"', cls: 'quote' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚翻了个身。', cls: '' },
+      { text: '她给自己说：明天再说。', cls: '' },
+      { text: '但她知道"明天再说"的意思是——', cls: 'dim' },
+      { text: '今晚别想了。', cls: '' },
+      { text: '可她做不到。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '2' },
+    ]
+  },
+
+  '1C': {
+    lines: [
+      { text: '林晚，24岁，普通二本，中文系。', cls: 'dim' },
+      { text: '她想找一份新媒体运营的工作。', cls: '' },
+      { text: '不是什么大厂执念——', cls: 'dim' },
+      { text: '她只是觉得，自己好像真的会做这件事。', cls: '' },
+      { text: '校园公众号是她一个人从零做起来的，', cls: 'dim' },
+      { text: '那种看着阅读量从两位数涨到五位数的感觉，', cls: '' },
+      { text: '她到现在都记得。', cls: 'dim' },
+      { text: '可秋招开始了，', cls: '' },
+      { text: '她才发现——', cls: '' },
+      { text: '"会做"和"能被看见"，', cls: 'dim' },
+      { text: '中间隔着23封拒信。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '2' },
+    ]
+  },
+
+  '2': {
+    lines: [
+      { text: '林晚不知道自己怎么走进浴室的。', cls: '' },
+      { text: '她把水开到最大，', cls: '' },
+      { text: '冷的。', cls: 'highlight' },
+      { text: '她需要感觉一点什么——', cls: 'dim' },
+      { text: '任何东西都行。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '水流过手背的时候，', cls: '' },
+      { text: '她抬头看了一眼镜子。', cls: '' },
+      { text: '镜子里的人也看着她。', cls: '' },
+      { text: '她突然想问那个镜像一个问题——', cls: 'dim' },
+    ],
+    choices: [
+      { text: '我到底哪里不行？', next: '2A' },
+      { text: '我是不是应该放弃了？', next: '2B' },
+      { text: '别人是不是都比我强？', next: '2C' },
+    ]
+  },
+
+  '2A': {
+    lines: [
+      { text: '"我到底哪里不行？"', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '镜子里没有回答。', cls: '' },
+      { text: '但林晚的脑子里开始列清单——', cls: 'dim' },
+      { text: '学历？二本，简历筛选第一轮就被刷。', cls: 'dim' },
+      { text: '实习？只有一段，还是在一家十几个人的小公司。', cls: 'dim' },
+      { text: '技能？会写稿、会排版、会做图，但每一项都不"专业"。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '她看着清单，', cls: '' },
+      { text: '觉得自己像一个什么都会一点、', cls: '' },
+      { text: '但什么都不够格的人。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '可她忘了——', cls: '' },
+      { text: '那个从零做到3000粉的人，', cls: 'dim' },
+      { text: '那个凌晨三点还在改标题的人，', cls: 'dim' },
+      { text: '那个被拒22次还投了第23份的人，', cls: '' },
+      { text: '也是她。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '3' },
+    ]
+  },
+
+  '2B': {
+    lines: [
+      { text: '"我是不是应该放弃了？"', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '第8封拒信的时候，她跟室友说"我不投了"。', cls: 'dim' },
+      { text: '然后第二天又投了两份。', cls: '' },
+      { text: '第15封的时候，她删了智联App。', cls: 'dim' },
+      { text: '三天后又装回来了。', cls: '' },
+      { text: '第20封的时候，她真的停了一周。', cls: 'dim' },
+      { text: '然后第八天，', cls: '' },
+      { text: '她发现不投简历比投了被拒更难受。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '放弃不会更轻松。', cls: '' },
+      { text: '放弃只是换了一种方式——', cls: 'dim' },
+      { text: '不被拒绝，但也不被考虑。', cls: '' },
+      { text: '连机会都没有了。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '3' },
+    ]
+  },
+
+  '2C': {
+    lines: [
+      { text: '"别人是不是都比我强？"', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚刷到过一个帖子——', cls: 'dim' },
+      { text: '"985本硕，三段大厂实习，秋招还是0 offer"。', cls: 'quote' },
+      { text: '那个帖子下面有3000条评论。', cls: '' },
+      { text: '3000个看起来比她厉害得多的人，', cls: 'dim' },
+      { text: '也在被拒绝。', cls: '' },
+      { text: '可这没有让她好受一点。', cls: '' },
+      { text: '反而更难受了——', cls: 'dim' },
+      { text: '如果他们都不行，那我呢？', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '但她没有刷到的是——', cls: '' },
+      { text: '她室友，投了40份，拿到了3个面试，1个offer。', cls: 'dim' },
+      { text: '学长张远，投了半年，签了不想去的公司，', cls: 'dim' },
+      { text: '三个月后跳槽，反而进了想去的行业。', cls: '' },
+      { text: '没有人的路是直的。', cls: '' },
+      { text: '你只看到了他们"到了"的那一刻。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '3' },
+    ]
+  },
+
+  '3': {
+    lines: [
+      { text: '林晚上了天台。', cls: '' },
+      { text: '不是你想的那种。', cls: 'dim' },
+      { text: '她只是想吹吹风。', cls: '' },
+      { text: '但风吹过来的时候，', cls: '' },
+      { text: '她发现——', cls: '' },
+      { text: '她连冷都感觉不到了。', cls: 'highlight' },
+      { text: '不是麻木。', cls: '' },
+      { text: '是空了。', cls: '' },
+      { text: '像烧完的炭，', cls: 'dim' },
+      { text: '还有一点形状，', cls: 'dim' },
+      { text: '但碰一下就碎。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '脚边有个打火机。', cls: '' },
+      { text: '她点了一下。', cls: '' },
+      { text: '火苗在风里摇摇晃晃，', cls: 'dim' },
+      { text: '快灭了，', cls: '' },
+      { text: '又没灭。', cls: 'highlight' },
+      { text: '她盯着那簇火看了很久。', cls: 'dim' },
+    ],
+    choices: [
+      { text: '用手拢住那簇火', next: '3A' },
+      { text: '灭了就灭了吧', next: '3B' },
+      { text: '再点一次', next: '3C' },
+    ]
+  },
+
+  '3A': {
+    lines: [
+      { text: '你让林晚用手拢住了那簇火。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '手掌围起来的那个小空间里，', cls: '' },
+      { text: '风进不来。', cls: '' },
+      { text: '火苗稳住了。', cls: '' },
+      { text: '不大，但亮了。', cls: 'highlight' },
+      { text: '橙色的光映在她手指上，', cls: 'dim' },
+      { text: '皮肤上有一点点温度。', cls: '' },
+      { text: '就一点点。', cls: 'dim' },
+      { text: '但在这个凌晨两点的天台上，', cls: '' },
+      { text: '这一点点，就够了。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '有时候你不需要一把大火。', cls: '' },
+      { text: '你只需要——', cls: 'dim' },
+      { text: '有什么挡一下风。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '4' },
+    ]
+  },
+
+  '3B': {
+    lines: [
+      { text: '火灭了。', cls: '' },
+      { text: '天台上只剩风声。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚低头看着手里的打火机。', cls: '' },
+      { text: '黑色的，几块钱的那种。', cls: 'dim' },
+      { text: '上面有个划痕，不知道什么时候磕的。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '她不知道自己为什么又摁了一下。', cls: '' },
+      { text: '"咔嗒"——', cls: 'highlight' },
+      { text: '火又出来了。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '你可以选择让它灭。', cls: '' },
+      { text: '但你手上的打火机还在。', cls: '' },
+      { text: '只要还在，', cls: 'dim' },
+      { text: '就还能再点一次。', cls: 'highlight' },
+      { text: '不是因为你坚强。', cls: '' },
+      { text: '是因为你还没把打火机扔掉。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '4' },
+    ]
+  },
+
+  '3C': {
+    lines: [
+      { text: '林晚摁了打火机。', cls: '' },
+      { text: '一次。', cls: 'dim' },
+      { text: '火苗出来，又缩回去。', cls: '' },
+      { text: '两次。', cls: 'dim' },
+      { text: '出来，晃了晃，灭了。', cls: '' },
+      { text: '三次。', cls: 'dim' },
+      { text: '这次她把大拇指按住不放。', cls: '' },
+      { text: '火苗稳了。', cls: 'highlight' },
+      { text: '在风里歪歪扭扭的，', cls: 'dim' },
+      { text: '但没有灭。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚觉得这个画面很蠢。', cls: 'dim' },
+      { text: '凌晨两点，坐在天台上，', cls: 'dim' },
+      { text: '和一个打火机较劲。', cls: '' },
+      { text: '但她笑了。', cls: '' },
+      { text: '很小声的，', cls: 'dim' },
+      { text: '从鼻腔里哼出来的那种笑。', cls: 'dim' },
+      { text: '不是开心。', cls: '' },
+      { text: '是——好吧，还没死呢。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '4' },
+    ]
+  },
+
+  '4': {
+    lines: [
+      { text: '回到房间后，', cls: '' },
+      { text: '林晚做了一件事——', cls: '' },
+      { text: '她打开了妈妈的微信对话框。', cls: '' },
+      { text: '上一条消息还是三天前：', cls: 'dim' },
+      { text: '「晚晚，面试结果怎么样了？」', cls: 'quote' },
+      { text: '她当时回的是：「还在等呢。」', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '其实那时候已经收到了拒信。', cls: '' },
+      { text: '她不想说。', cls: '' },
+      { text: '不是怕妈妈担心。', cls: 'dim' },
+      { text: '是怕那句"没关系，慢慢来"。', cls: '' },
+      { text: '她知道妈妈是真心说的。', cls: 'dim' },
+      { text: '但"慢慢来"三个字——', cls: '' },
+      { text: '在投了23份简历之后，', cls: '' },
+      { text: '听起来像一句安慰，', cls: 'dim' },
+      { text: '却不像一个答案。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '发一条：妈，我有点累', next: '4A' },
+      { text: '算了，明天再说', next: '4B' },
+      { text: '发给朋友吧', next: '4C' },
+    ]
+  },
+
+  '4A': {
+    lines: [
+      { text: '「妈，我有点累。」', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '发出去之后，林晚后悔了。', cls: '' },
+      { text: '凌晨两点给妈妈发消息说累——', cls: 'dim' },
+      { text: '这不是让她睡不着吗？', cls: '' },
+      { text: '她想撤回。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '但对话框上方出现了——', cls: '' },
+      { text: '「对方正在输入……」', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '「我就知道」', cls: 'quote' },
+      { text: '「你三天前说还在等的时候我就知道」', cls: 'quote' },
+      { text: '「晚晚，你不用扛着」', cls: 'quote' },
+      { text: '「妈不会说让你慢慢来的话了」', cls: 'quote' },
+      { text: '「你想哭就哭，明天咱吃顿好的」', cls: 'quote' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚没哭。', cls: '' },
+      { text: '但她鼻子酸了。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '5' },
+    ]
+  },
+
+  '4B': {
+    lines: [
+      { text: '她删掉了那些字。', cls: '' },
+      { text: '明天再说吧。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '可"明天再说"总是变成——', cls: '' },
+      { text: '"后天再说""下周再说""算了不说了"。', cls: 'dim' },
+      { text: '那些说不出口的话，', cls: '' },
+      { text: '不会消失。', cls: 'highlight' },
+      { text: '它们会变成——', cls: 'dim' },
+      { text: '失眠，', cls: '' },
+      { text: '莫名其妙地烦躁，', cls: '' },
+      { text: '刷到别人的offer帖时那种胸口发紧的感觉。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '有些话说出来不是为了解决问题。', cls: '' },
+      { text: '只是为了——', cls: 'dim' },
+      { text: '让另一个人知道，你在扛着。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '5' },
+    ]
+  },
+
+  '4C': {
+    lines: [
+      { text: '林晚翻了翻通讯录。', cls: '' },
+      { text: '停在了"陈陈"——', cls: 'dim' },
+      { text: '大学室友，同样在秋招里挣扎。', cls: '' },
+      { text: '上周刚被拒了第17次。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '「陈陈，你睡了吗」', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '秒回：', cls: 'dim' },
+      { text: '「没 睡不着 你也是吧」', cls: 'quote' },
+      { text: '「23了」', cls: 'quote' },
+      { text: '「我18」', cls: 'quote' },
+      { text: '「我们好惨」', cls: 'quote' },
+      { text: '「哈哈哈哈」', cls: 'quote' },
+      { text: '……', cls: 'pause-line' },
+      { text: '那个"哈哈哈哈"不是真的在笑。', cls: '' },
+      { text: '但那条消息发过来的时候，', cls: '' },
+      { text: '林晚觉得——', cls: 'dim' },
+      { text: '好像没那么冷了。', cls: '' },
+      { text: '只是有人也在黑夜里坐着，', cls: 'dim' },
+      { text: '还愿意跟你说一声：', cls: '' },
+      { text: '我也在。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '5' },
+    ]
+  },
+
+  '5': {
+    lines: [
+      { text: '不知道过了多久。', cls: '' },
+      { text: '窗外好像没那么黑了。', cls: '' },
+      { text: '不是天亮了。', cls: 'dim' },
+      { text: '只是黑夜最浓的那一段——', cls: '' },
+      { text: '过去了。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '林晚看着桌上的秋招时间表。', cls: '' },
+      { text: '上面密密麻麻划掉了好多行。', cls: 'dim' },
+      { text: '但她突然注意到——', cls: '' },
+      { text: '划掉的行和行之间，', cls: 'dim' },
+      { text: '有几个字她当初写得很小：', cls: '' },
+      { text: '"公众号粉丝破千"', cls: 'quote' },
+      { text: '"第一次面试，虽然挂了"', cls: 'quote' },
+      { text: '"写了一篇10w+"', cls: 'quote' },
+      { text: '"面试官说我运营思路清晰"', cls: 'quote' },
+      { text: '……', cls: 'pause-line' },
+      { text: '这些字太小了。', cls: '' },
+      { text: '小到她之前从来没有看见过。', cls: 'dim' },
+      { text: '但它们一直在那里。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '把这些小事记下来', next: '5A' },
+      { text: '重新改一份简历', next: '5B' },
+      { text: '先睡吧，明天再说也行', next: '5C' },
+    ]
+  },
+
+  '5A': {
+    lines: [
+      { text: '她把时间表翻到背面。', cls: '' },
+      { text: '写下：', cls: 'dim' },
+      { text: '「9月12日 我把一个公众号从0做到了1000」', cls: 'quote' },
+      { text: '「9月28日 我有了人生第一次面试」', cls: 'quote' },
+      { text: '「10月5日 我写出了一篇10w+」', cls: 'quote' },
+      { text: '「10月19日 有人说过我运营思路清晰」', cls: 'quote' },
+      { text: '「11月3日 我投了第23份简历 还没死」', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '那些事不大。', cls: '' },
+      { text: '放在别人身上可能根本不算什么。', cls: 'dim' },
+      { text: '但那是她做的。', cls: '' },
+      { text: '真真实实是她做的。', cls: '' },
+      { text: '被拒绝不会让这些事消失。', cls: 'dim' },
+      { text: '它们只是被23封拒信盖住了。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '6' },
+    ]
+  },
+
+  '5B': {
+    lines: [
+      { text: '她打开了简历。', cls: '' },
+      { text: '不是为了投。', cls: 'dim' },
+      { text: '就是想看看。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '看着看着，她把"参与校园公众号运营"', cls: '' },
+      { text: '改成了"独立运营校园公众号，12个月内粉丝从0增长至3000+"。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '其实之前也想过改。', cls: 'dim' },
+      { text: '但总觉得自己写的那些不够格。', cls: '' },
+      { text: '可今天凌晨两点的她，', cls: '' },
+      { text: '突然觉得——', cls: '' },
+      { text: '从0到1是了不起的事。', cls: 'highlight' },
+      { text: '从1到3000也是。', cls: '' },
+      { text: '你不需要做到10w，', cls: 'dim' },
+      { text: '才配被写进自己的简历里。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '6' },
+    ]
+  },
+
+  '5C': {
+    lines: [
+      { text: '她躺下了。', cls: '' },
+      { text: '没有改简历，没有记东西，没有打开招聘软件。', cls: 'dim' },
+      { text: '只是——睡了。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '这没什么不好的。', cls: '' },
+      { text: '有些夜晚就是用来睡觉的。', cls: '' },
+      { text: '不是每个深夜都得做点什么。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '但她定了明早八点的闹钟。', cls: '' },
+      { text: '不是因为"明天又是新的一天"。', cls: 'dim' },
+      { text: '而是因为——', cls: '' },
+      { text: '她想看看明天的天亮的时候，', cls: 'dim' },
+      { text: '自己会在哪里。', cls: '' },
+      { text: '……', cls: 'pause-line' },
+      { text: '睡吧。', cls: 'dim' },
+      { text: '火没灭。', cls: '' },
+      { text: '只是需要添点柴。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '继续', next: '6' },
+    ]
+  },
+
+  '6': {
+    lines: [
+      { text: '林晚的故事，到这里暂停了。', cls: '' },
+      { text: '她没有拿到offer。', cls: '' },
+      { text: '没有逆袭，没有反转，没有"第24次终于成了"。', cls: 'dim' },
+      { text: '……', cls: 'pause-line' },
+      { text: '她只是——', cls: '' },
+      { text: '还没灭。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '这就够了。', cls: 'dim' },
+      { text: '今天够了吗？', cls: '' },
+      { text: '够了。', cls: 'highlight' },
+      { text: '……', cls: 'pause-line' },
+      { text: '', cls: '', isFireCenter: true },
+      { text: '现在轮到你了。', cls: 'highlight' },
+    ],
+    choices: [
+      { text: '🔥  火种对话', next: 'bot-fire', cls: 'final-btn fire-btn' },
+      { text: '🕯️  燃灯仪式', next: 'bot-light', cls: 'final-btn lamp-btn' },
+      { text: '✨  星河地图', next: 'bot-map', cls: 'final-btn star-btn' },
+    ],
+    isFinal: true
+  }
+};
+
+// ===== 场景渲染引擎 =====
+const textArea = document.getElementById('text-area');
+const choicesArea = document.getElementById('choices');
+const overlay = document.getElementById('transition-overlay');
+
+let isTransitioning = false;
+
+function showScene(sceneId) {
+  if (isTransitioning) return;
+
+  // 处理终幕跳转Bot（必须在scene检查之前）
+  if (sceneId.startsWith('bot-')) {
+    const botUrl = 'https://www.coze.cn/s/UoNK-cgCneI/'; // 余火Bot链接
+    window.location.href = botUrl;
+    return;
+  }
+
+  const scene = scenes[sceneId];
+  if (!scene) return;
+
+  isTransitioning = true;
+  
+  // 过渡动画
+  overlay.classList.add('active');
+  
+  setTimeout(() => {
+    // 清空内容
+    textArea.innerHTML = '';
+    choicesArea.innerHTML = '';
+    choicesArea.classList.remove('visible');
+    
+    // 控制火焰强度
+    const isFinal = scene.isFinal;
+    const fireEl = document.getElementById('fire-canvas');
+    fireEl.style.opacity = isFinal ? '0.9' : '0.4';
+    
+    // 渲染文字
+    const lines = scene.lines;
+    lines.forEach((line, i) => {
+      if (line.isFireCenter) {
+        const fireDiv = document.createElement('div');
+        fireDiv.className = 'fire-center';
+        fireDiv.innerHTML = `
+          <div class="flame f1"></div>
+          <div class="flame f2"></div>
+          <div class="flame f3"></div>
+        `;
+        fireDiv.style.opacity = '0';
+        fireDiv.style.transform = 'translateY(10px)';
+        fireDiv.style.transition = 'opacity 1.5s ease, transform 1.5s ease';
+        textArea.appendChild(fireDiv);
+        
+        setTimeout(() => {
+          fireDiv.style.opacity = '1';
+          fireDiv.style.transform = 'translateY(0)';
+        }, i * 600 + 800);
+        return;
+      }
+      
+      const p = document.createElement('p');
+      p.className = `story-line ${line.cls}`;
+      p.textContent = line.text;
+      textArea.appendChild(p);
+      
+      // 逐行延迟显示
+      const delay = i * 600 + 800;
+      const isPauseLine = line.cls === 'pause-line';
+      const showDelay = isPauseLine ? delay - 300 : delay;
+      
+      setTimeout(() => {
+        p.classList.add('visible');
+      }, showDelay);
+    });
+    
+    // 计算选择按钮出现时间
+    const choicesDelay = lines.length * 600 + 2000;
+    
+    setTimeout(() => {
+      // 渲染选择按钮
+      scene.choices.forEach((choice, i) => {
+        const btn = document.createElement('button');
+        const cls = choice.cls || 'choice-btn';
+        btn.className = cls;
+        btn.innerHTML = `<span>${choice.text}</span>`;
+        btn.addEventListener('click', () => {
+          // 点击反馈
+          btn.style.borderColor = 'var(--fire-orange)';
+          btn.style.background = 'rgba(232, 100, 44, 0.15)';
+          setTimeout(() => showScene(choice.next), 300);
+        });
+        choicesArea.appendChild(btn);
+      });
+      
+      choicesArea.classList.add('visible');
+    }, choicesDelay);
+    
+    // 淡入
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      isTransitioning = false;
+    }, 300);
+    
+    // 滚动到顶部
+    document.getElementById('scene-container').scrollTop = 0;
+    
+  }, 1200);
+}
+
+// ===== 启动 =====
+// 延迟1秒启动，让星空先渲染
+setTimeout(() => showScene('0'), 1000);
+</script>
+</body>
+</html>
